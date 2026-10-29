@@ -95,7 +95,7 @@ bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, size_t chunk
     return true;
 }
 }
-bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::string& error, bool cpuTrace) {
+bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::string& error, bool cpuTrace, bool cpuStep) {
     const auto sep=endpoint.rfind(':');
     if (sep==std::string::npos || sep==0 || sep+1==endpoint.size() ||
         image.memory.size()!=image.header.imageSize) {
@@ -196,6 +196,30 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
             std::cout << "CPU TRACE: retail XBE entry=0x" << std::hex
                       << entry << std::dec << " (not activated)\n";
             std::cout << "CPU TRACE: register inspection only; no instructions executed\n";
+        }
+    }
+    if (ok && cpuStep) {
+        // QEMU GDB single-step is deliberately limited to ONE instruction.
+        // The CPU still has PC reset state, NOT Xbox protected-mode context.
+        std::string stop;
+        if (!rsp(sock, "s", stop) || stop.empty() ||
+            (stop[0] != 'S' && stop[0] != 'T')) {
+            error = "QEMU single-step failed or did not return a stop reply: " + stop;
+            ok = false;
+        } else {
+            std::cout << "CPU STEP: QEMU stop reply=" << stop << "\n";
+            std::string regs;
+            if (!rsp(sock, "g", regs) || regs.size() < 80 || regs[0] == 'E') {
+                error = "Cannot read registers after single-step";
+                ok = false;
+            } else {
+                // i386 GDB register 8 is EIP; little-endian hex bytes.
+                const auto le = regs.substr(8 * 8, 8);
+                std::cout << "CPU STEP: EIP after step=0x"
+                          << le.substr(6, 2) << le.substr(4, 2)
+                          << le.substr(2, 2) << le.substr(0, 2)
+                          << " (PC firmware, NOT XBE)\n";
+            }
         }
     }
     if (sock!=bad) shut(sock);

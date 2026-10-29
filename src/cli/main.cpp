@@ -28,7 +28,7 @@ bool save(const std::string& path, const std::vector<std::uint8_t>& bytes) {
 int main(int argc, char** argv) {
     // --extract-xbe-decrypted exports a research-only XBE with decoded
     // entry point and kernel thunk fields. It is NOT a bootable retail XBE.
-    bool isoMode = false, decodeExport = false, debugKeys = false, qemuWrite = false, cpuTrace = false;
+    bool isoMode = false, decodeExport = false, debugKeys = false, qemuWrite = false, cpuTrace = false, cpuStep = false;
     std::string endpoint = "127.0.0.1:1234";
     std::string inputPath, outputPath, biosPath, mcpxPath;
     for (int i = 1; i < argc; ++i) {
@@ -36,6 +36,9 @@ int main(int argc, char** argv) {
         if (arg == "--qemu-tcp" && i + 1 < argc) {
             qemuWrite = true;
             endpoint = argv[++i];
+        } else if (arg == "--cpu-step") {
+            cpuStep = true;
+            cpuTrace = true;
         } else if (arg == "--cpu-trace") {
             cpuTrace = true;
         } else if (arg == "--bios" && i + 1 < argc) {
@@ -58,7 +61,7 @@ int main(int argc, char** argv) {
     }
     if (inputPath.empty() || (debugKeys && !decodeExport) || (cpuTrace && !qemuWrite)) {
         std::cerr << "Usage: recompxbox [--iso] <game.iso|default.xbe>"
-                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys] [--qemu-tcp host:port] [--cpu-trace] [--bios xbox.bin] [--mcpx mcpx.bin]\n";
+                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys] [--qemu-tcp host:port] [--cpu-trace] [--cpu-step] [--bios xbox.bin] [--mcpx mcpx.bin]\n";
         return 2;
     }
 
@@ -148,12 +151,12 @@ int main(int argc, char** argv) {
                      "are not valid for normal Xbox loading.\n";
     }
     if (qemuWrite) {
-        if (!recompxbox::sendXbeToQemu(image, endpoint, error, cpuTrace)) {
+        if (!recompxbox::sendXbeToQemu(image, endpoint, error, cpuTrace, cpuStep)) {
             std::cerr << "QEMU TCP error: " << error << "\n";
             return 1;
         }
-        std::cout << "XBE transferred to paused QEMU (CPU not started)\n";
+        std::cout << "XBE transferred to QEMU (CPU execution only if --cpu-step was specified)\n";
     }
-    std::cout << "x86 execution: NOT IMPLEMENTED (CPU trace is inspection only)\n";
+    std::cout << (cpuStep ? "x86 execution: one QEMU PC instruction stepped (NOT Xbox XBE boot)\n" : "x86 execution: NOT IMPLEMENTED (CPU trace is inspection only)\n");
     return 0;
 }
