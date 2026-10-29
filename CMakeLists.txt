@@ -10,10 +10,14 @@ add_library(recompxbox_d3d8 STATIC
   src/xbe/xbe_image.cpp
   src/cpu/x86_probe.cpp
   src/trace/trace_logger.cpp
-  src/iso/xdvdfs.cpp)
+  src/iso/xdvdfs.cpp
+  src/cpu/qemu_rsp.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
+if(WIN32)
+  target_link_libraries(recompxbox_d3d8 PUBLIC ws2_32)
+endif()
 option(RECOMPXBOX_USE_CXBX_HEADERS "Compile against original Cxbx D3D8 headers" OFF)
 if(RECOMPXBOX_USE_CXBX_HEADERS)
   if(NOT WIN32)

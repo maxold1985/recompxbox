@@ -1,5 +1,6 @@
 #include "recompxbox/xbe_image.h"
 #include "recompxbox/xdvdfs.h"
+#include "recompxbox/qemu_rsp.h"
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -25,11 +26,15 @@ bool save(const std::string& path, const std::vector<std::uint8_t>& bytes) {
 int main(int argc, char** argv) {
     // --extract-xbe-decrypted exports a research-only XBE with decoded
     // entry point and kernel thunk fields. It is NOT a bootable retail XBE.
-    bool isoMode = false, decodeExport = false, debugKeys = false;
+    bool isoMode = false, decodeExport = false, debugKeys = false, qemuWrite = false;
+    std::string endpoint = "127.0.0.1:1234";
     std::string inputPath, outputPath;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--iso") {
+        if (arg == "--qemu-tcp" && i + 1 < argc) {
+            qemuWrite = true;
+            endpoint = argv[++i];
+        } else if (arg == "--iso") {
             isoMode = true;
         } else if (arg == "--debug-keys") {
             debugKeys = true;
@@ -45,7 +50,7 @@ int main(int argc, char** argv) {
     }
     if (inputPath.empty() || (debugKeys && !decodeExport)) {
         std::cerr << "Usage: recompxbox [--iso] <game.iso|default.xbe>"
-                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys]\n";
+                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys] [--qemu-tcp host:port]\n";
         return 2;
     }
 
@@ -116,6 +121,13 @@ int main(int argc, char** argv) {
         std::cout << "Wrote research-only decoded-header XBE: " << outputPath << "\n";
         std::cout << "WARNING: Not a bootable XBE; signatures/header fields "
                      "are not valid for normal Xbox loading.\n";
+    }
+    if (qemuWrite) {
+        if (!recompxbox::sendXbeToQemu(image, endpoint, error)) {
+            std::cerr << "QEMU TCP error: " << error << "\n";
+            return 1;
+        }
+        std::cout << "XBE transferred to paused QEMU (CPU not started)\n";
     }
     std::cout << "x86 execution: NOT IMPLEMENTED\n";
     return 0;
