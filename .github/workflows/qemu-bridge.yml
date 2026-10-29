@@ -1,0 +1,11 @@
+name: QEMU XBE bridge tests
+on:
+  push:
+  pull_request:
+jobs:
+  python-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test XBE bridge parser
+        run: python3 -m unittest discover -s tests -p 'test_qemu_bridge.py'
