@@ -9,7 +9,8 @@ add_library(recompxbox_d3d8 STATIC
   src/xbe/xbe_header.cpp
   src/xbe/xbe_image.cpp
   src/cpu/x86_probe.cpp
-  src/trace/trace_logger.cpp)
+  src/trace/trace_logger.cpp
+  src/iso/xdvdfs.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
