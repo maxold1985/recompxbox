@@ -59,7 +59,7 @@ bool rsp(Sock s, const std::string& cmd, std::string& answer) {
         sendAll(s,"-");
         return false;
     }
-    return sendAll(s,"+") && !(answer.size()==3 && answer[0]=='E');
+    return sendAll(s,"+");
 }
 bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string& error) {
     constexpr char hex[]="0123456789abcdef";
@@ -75,8 +75,13 @@ bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string&
             cmd.push_back(hex[v&15]);
         }
         std::string reply;
-        if (!rsp(s,cmd,reply) || reply!="OK") {
-            error="QEMU rejected memory write at "+std::to_string(addr+off);
+        if (!rsp(s,cmd,reply)) {
+            error="GDB RSP transport/checksum failure at address "+std::to_string(addr+off);
+            return false;
+        }
+        if (reply!="OK") {
+            error="QEMU rejected memory write at "+std::to_string(addr+off)+
+                  " (reply: "+reply+")";
             return false;
         }
         if ((off / 1024) % 256 == 0 || off + n == len) {
