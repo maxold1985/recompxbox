@@ -1,0 +1,13 @@
+name: QEMU ISO TCP bridge tests
+on:
+  push:
+    branches: [mainn]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test ISO bridge
+        run: python3 -m unittest discover -s tests -p 'test_qemu_iso_bridge.py'

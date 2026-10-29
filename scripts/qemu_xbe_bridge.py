@@ -5,6 +5,9 @@ This is a real CPU/memory transport integration, NOT an Xbox kernel runtime.
 It does not configure protected mode, paging, entrypoint, or execute XBE code.
 """
 import argparse
+from pathlib import Path
+
+from xdvdfs_reader import XDVDFS
 import socket
 import struct
 import sys
@@ -90,15 +93,33 @@ class RSP:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("xbe", help="Path to a locally owned XBE image")
+    parser.add_argument("xbe", help="Path to a locally owned XBE or Xbox XDVDFS ISO")
+    parser.add_argument("--iso", action="store_true", help="Read D:/default.xbe directly from an XDVDFS ISO")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=1234)
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--write", action="store_true",
                         help="Explicitly authorize writing XBE headers/sections into QEMU guest memory")
     args = parser.parse_args()
-    with open(args.xbe, "rb") as handle:
-        base, header, sections = parse_xbe(handle.read())
+    if args.iso:
+        image = XDVDFS(args.xbe)
+        try:
+            data_path = Path(args.xbe)
+            image.walk()
+            # Read the XBE directly from the ISO; no intermediate output file.
+            record = image.entries.get("default.xbe")
+            if record is None or record[3] & 0x10:
+                raise ValueError("default.xbe not found in ISO root")
+            if record[2] > MAX_IMAGE:
+                raise ValueError("XBE file exceeds maximum supported size")
+            data = image.read(record[1] * 2048, record[2])
+            print(f"XDVDFS: {data_path.name}, default.xbe={len(data)} bytes")
+        finally:
+            image.close()
+    else:
+        with open(args.xbe, "rb") as handle:
+            data = handle.read()
+    base, header, sections = parse_xbe(data)
     print(f"XBE base=0x{base:08x}, sections={len(sections)}")
     if not args.write:
         print("Dry run. Add --write to transfer bytes to a paused QEMU guest.")
