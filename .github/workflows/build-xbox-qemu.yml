@@ -1,0 +1,65 @@
+name: Build Xbox-capable QEMU (xemu Linux)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xemu-linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout recompxbox
+        uses: actions/checkout@v4
+
+      - name: Enable Ubuntu source repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          # apt build-dep needs deb-src indexes; use Ubuntu's existing deb822 sources.
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+
+      - name: Install xemu build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y git build-essential python3 python3-venv ninja-build meson pkg-config libusb-1.0-0-dev
+          git clone --depth 1 https://github.com/xemu-project/xemu.git third_party/xemu
+          cd third_party/xemu
+          git submodule update --init --recursive
+          # Upstream xemu ships Debian build-dependency metadata.
+          sudo apt-get build-dep -y .
+
+      - name: Compile Xbox QEMU TCG
+        shell: bash
+        env:
+          XEMU_JOBS: "2"
+        run: bash scripts/build_xemu_qemu.sh
+
+      - name: Validate Xbox machine support
+        shell: bash
+        run: |
+          set -euo pipefail
+          third_party/xemu/build/qemu-system-i386 -machine help | tee xbox-machines.txt
+          # Fail rather than uploading an ordinary PC-only QEMU build.
+          grep -Ei 'xbox' xbox-machines.txt
+
+      - name: Stage Linux binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp third_party/xemu/build/qemu-system-i386 dist/qemu-system-i386-xbox
+          chmod +x dist/qemu-system-i386-xbox
+          ldd dist/qemu-system-i386-xbox > dist/runtime-libraries.txt || true
+          cp xbox-machines.txt dist/
+
+      - name: Upload Xbox QEMU Linux build
+        uses: actions/upload-artifact@v4
+        with:
+          name: recompxbox-xemu-qemu-linux
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
