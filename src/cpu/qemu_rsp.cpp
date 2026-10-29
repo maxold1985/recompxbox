@@ -95,7 +95,7 @@ bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, size_t chunk
     return true;
 }
 }
-bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::string& error) {
+bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::string& error, bool cpuTrace) {
     const auto sep=endpoint.rfind(':');
     if (sep==std::string::npos || sep==0 || sep+1==endpoint.size() ||
         image.memory.size()!=image.header.imageSize) {
@@ -171,6 +171,32 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
         const size_t off=section.virtualAddress-image.header.baseAddress;
         if (!(ok=write(sock,section.virtualAddress,image.memory.data()+off,
                        section.virtualSize,chunkSize,error))) break;
+    }
+    if (ok && cpuTrace) {
+        // Read-only diagnostics: the generic QEMU PC CPU is not an Xbox CPU.
+        // Do not modify EIP or single-step before setting up a 32-bit guest context.
+        std::string regs;
+        if (!rsp(sock, "g", regs) || regs.empty() || regs[0] == 'E') {
+            error = "Cannot read QEMU CPU registers (g packet: " + regs + ")";
+            ok = false;
+        } else {
+            std::cout << "CPU TRACE: QEMU register snapshot (" << regs.size()
+                      << " hex chars)\n";
+            constexpr const char* names[] = {"EAX","ECX","EDX","EBX","ESP","EBP","ESI","EDI","EIP","EFLAGS"};
+            for (size_t i = 0; i < 10 && (i + 1) * 8 <= regs.size(); ++i) {
+                // i386 GDB register order, each 32-bit value in little-endian bytes.
+                const auto offset = i * 8;
+                std::string le = regs.substr(offset, 8);
+                std::cout << "  " << names[i] << "=0x"
+                          << le.substr(6,2) << le.substr(4,2)
+                          << le.substr(2,2) << le.substr(0,2) << "\n";
+            }
+            constexpr uint32_t retailEntryKey = 0xA8FC57AB;
+            const auto entry = image.header.entryPointEncoded ^ retailEntryKey;
+            std::cout << "CPU TRACE: retail XBE entry=0x" << std::hex
+                      << entry << std::dec << " (not activated)\n";
+            std::cout << "CPU TRACE: register inspection only; no instructions executed\n";
+        }
     }
     if (sock!=bad) shut(sock);
 #ifdef _WIN32
