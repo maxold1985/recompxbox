@@ -7,6 +7,32 @@ add_library(recompxbox_d3d8 STATIC
   src/hle/d3d8/device.cpp
   src/hle/d3d8/cxbx_primitives.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# Original Cxbx headers require Windows and the legacy DirectX SDK.
+option(RECOMPXBOX_USE_CXBX_HEADERS "Compile against original Cxbx D3D8 headers" OFF)
+if(RECOMPXBOX_USE_CXBX_HEADERS)
+  if(NOT WIN32)
+    message(FATAL_ERROR "Cxbx D3D8 header bridge requires Windows")
+  endif()
+  set(CXBX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Cxbx-Reloaded/src")
+  if(NOT EXISTS "${CXBX_SOURCE_DIR}/core/hle/D3D8/XbD3D8Types.h")
+    message(FATAL_ERROR "Cxbx submodule missing; run git submodule update --init third_party/Cxbx-Reloaded")
+  endif()
+  include(CheckIncludeFileCXX)
+  foreach(header d3d9.h d3dx9math.h d3dx9tex.h dxerr9.h)
+    string(MAKE_C_IDENTIFIER "${header}" header_id)
+    string(TOUPPER "${header_id}" header_id)
+    check_include_file_cxx("${header}" "HAVE_${header_id}")
+    if(NOT HAVE_${header_id})
+      message(FATAL_ERROR "Missing ${header}; install/configure the legacy DirectX SDK")
+    endif()
+  endforeach()
+  add_library(recompxbox_cxbx_header_check OBJECT src/hle/d3d8/cxbx_header_compile.cpp)
+  target_include_directories(recompxbox_cxbx_header_check PRIVATE
+    "${CXBX_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  target_compile_definitions(recompxbox_cxbx_header_check PRIVATE RECOMPXBOX_USE_CXBX_HEADERS=1)
+endif()
+
 option(RECOMPXBOX_BUILD_RAYLIB "Build raylib renderer demo" OFF)
 if(RECOMPXBOX_BUILD_RAYLIB)
   find_package(raylib CONFIG REQUIRED)
