@@ -4,6 +4,9 @@
 #include <iostream>
 #include <string>
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
@@ -26,7 +29,7 @@ void shut(Sock s) { close(s); }
 bool sendAll(Sock s, const std::string& b) {
     size_t p = 0;
     while (p < b.size()) {
-        int n = send(s, b.data() + p, static_cast<int>(std::min<size_t>(4096, b.size()-p)), 0);
+        int n = send(s, b.data() + p, static_cast<int>((std::min<size_t>)(4096, b.size()-p)), 0);
         if (n <= 0) return false;
         p += static_cast<size_t>(n);
     }
@@ -64,7 +67,7 @@ bool rsp(Sock s, const std::string& cmd, std::string& answer) {
 bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, size_t chunkSize, std::string& error) {
     constexpr char hex[]="0123456789abcdef";
     for (size_t off=0; off<len; off+=chunkSize) {
-        size_t n=std::min(chunkSize,len-off);
+        size_t n=(std::min)(chunkSize,len-off);
         char label[64];
         std::snprintf(label,sizeof(label),"M%llx,%zx:",
                       static_cast<unsigned long long>(addr+off),n);
@@ -151,7 +154,7 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
                 // M packet encodes each byte as two hex characters.
                 // Reserve 64 characters for the address and length prefix.
                 if (limit >= 256 && limit <= 1048576)
-                    chunkSize = std::min<size_t>(16384, (limit - 64) / 2);
+                    chunkSize = (std::min<size_t>)(16384, (limit - 64) / 2);
             } catch (...) {
                 // Fall back to the conservative 1024-byte writes.
             }
