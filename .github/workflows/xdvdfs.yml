@@ -1,0 +1,11 @@
+name: XDVDFS reader tests
+on:
+  push:
+  pull_request:
+jobs:
+  xdvdfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test XDVDFS extraction
+        run: python3 -m unittest discover -s tests -p test_xdvdfs_reader.py
