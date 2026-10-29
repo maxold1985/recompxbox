@@ -8,7 +8,8 @@ add_library(recompxbox_d3d8 STATIC
   src/hle/d3d8/cxbx_primitives.cpp
   src/xbe/xbe_header.cpp
   src/xbe/xbe_image.cpp
-  src/cpu/x86_probe.cpp)
+  src/cpu/x86_probe.cpp
+  src/trace/trace_logger.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
@@ -57,6 +58,9 @@ if(BUILD_TESTING)
   add_executable(recompxbox_x86_probe_tests tests/x86_probe_tests.cpp)
   target_link_libraries(recompxbox_x86_probe_tests PRIVATE recompxbox_d3d8)
   add_test(NAME x86_probe COMMAND recompxbox_x86_probe_tests)
+  add_executable(recompxbox_trace_logger_tests tests/trace_logger_tests.cpp)
+  target_link_libraries(recompxbox_trace_logger_tests PRIVATE recompxbox_d3d8)
+  add_test(NAME trace_logger COMMAND recompxbox_trace_logger_tests)
 endif()
 
 # Optional upstream QEMU/TCG build. This is a separate toolchain target,
