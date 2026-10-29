@@ -5,10 +5,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(CTest)
 add_library(recompxbox_d3d8 STATIC
   src/hle/d3d8/device.cpp
-  src/hle/d3d8/cxbx_primitives.cpp)
+  src/hle/d3d8/cxbx_primitives.cpp
+  src/xbe/xbe_header.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# Original Cxbx headers require Windows and the legacy DirectX SDK.
 option(RECOMPXBOX_USE_CXBX_HEADERS "Compile against original Cxbx D3D8 headers" OFF)
 if(RECOMPXBOX_USE_CXBX_HEADERS)
   if(NOT WIN32)
@@ -32,7 +31,6 @@ if(RECOMPXBOX_USE_CXBX_HEADERS)
     "${CXBX_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
   target_compile_definitions(recompxbox_cxbx_header_check PRIVATE RECOMPXBOX_USE_CXBX_HEADERS=1)
 endif()
-
 option(RECOMPXBOX_BUILD_RAYLIB "Build raylib renderer demo" OFF)
 if(RECOMPXBOX_BUILD_RAYLIB)
   find_package(raylib CONFIG REQUIRED)
@@ -46,4 +44,7 @@ if(BUILD_TESTING)
   add_executable(recompxbox_cxbx_primitive_tests tests/cxbx_primitives_tests.cpp)
   target_link_libraries(recompxbox_cxbx_primitive_tests PRIVATE recompxbox_d3d8)
   add_test(NAME cxbx_primitives COMMAND recompxbox_cxbx_primitive_tests)
+  add_executable(recompxbox_xbe_header_tests tests/xbe_header_tests.cpp)
+  target_link_libraries(recompxbox_xbe_header_tests PRIVATE recompxbox_d3d8)
+  add_test(NAME xbe_header COMMAND recompxbox_xbe_header_tests)
 endif()
