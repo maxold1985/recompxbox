@@ -18,8 +18,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # apt build-dep needs deb-src indexes; use Ubuntu's existing deb822 sources.
-          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          # Ubuntu runners may use either deb822 .sources or legacy .list files.
+          # Enable source repositories without assuming a particular filename.
+          if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+            sudo sed -i -E 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          elif [[ -f /etc/apt/sources.list ]]; then
+            awk '/^[[:space:]]*deb[[:space:]]/ {sub(/^[[:space:]]*deb[[:space:]]/, "deb-src "); print}' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/recompxbox-src.list >/dev/null
+          else
+            echo "No supported Ubuntu APT sources configuration found" >&2
+            exit 1
+          fi
           sudo apt-get update
 
       - name: Install xemu build dependencies
