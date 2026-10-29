@@ -11,7 +11,8 @@ add_library(recompxbox_d3d8 STATIC
   src/cpu/x86_probe.cpp
   src/trace/trace_logger.cpp
   src/iso/xdvdfs.cpp
-  src/cpu/qemu_rsp.cpp)
+  src/cpu/qemu_rsp.cpp
+  src/gpu/nv2a.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
@@ -48,6 +49,9 @@ if(RECOMPXBOX_BUILD_RAYLIB)
   target_link_libraries(recompxbox_raylib_demo PRIVATE recompxbox_d3d8 raylib)
 endif()
 if(BUILD_TESTING)
+  add_executable(recompxbox_nv2a_tests tests/nv2a_tests.cpp)
+  target_link_libraries(recompxbox_nv2a_tests PRIVATE recompxbox_d3d8)
+  add_test(NAME nv2a_fifo COMMAND recompxbox_nv2a_tests)
   add_executable(recompxbox_d3d8_tests tests/d3d8_tests.cpp)
   target_link_libraries(recompxbox_d3d8_tests PRIVATE recompxbox_d3d8)
   add_test(NAME d3d8_state COMMAND recompxbox_d3d8_tests)
