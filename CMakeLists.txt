@@ -7,7 +7,8 @@ add_library(recompxbox_d3d8 STATIC
   src/hle/d3d8/device.cpp
   src/hle/d3d8/cxbx_primitives.cpp
   src/xbe/xbe_header.cpp
-  src/xbe/xbe_image.cpp)
+  src/xbe/xbe_image.cpp
+  src/cpu/x86_probe.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
@@ -53,4 +54,7 @@ if(BUILD_TESTING)
   add_executable(recompxbox_xbe_image_tests tests/xbe_image_tests.cpp)
   target_link_libraries(recompxbox_xbe_image_tests PRIVATE recompxbox_d3d8)
   add_test(NAME xbe_image COMMAND recompxbox_xbe_image_tests)
+  add_executable(recompxbox_x86_probe_tests tests/x86_probe_tests.cpp)
+  target_link_libraries(recompxbox_x86_probe_tests PRIVATE recompxbox_d3d8)
+  add_test(NAME x86_probe COMMAND recompxbox_x86_probe_tests)
 endif()
