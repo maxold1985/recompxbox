@@ -1,15 +1,55 @@
-name: HLE prototype build
+name: Build recompxbox (Windows and Linux)
+
 on:
   push:
+    branches: [mainn]
   pull_request:
+  workflow_dispatch:
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        build_type: [Release]
     steps:
       - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -S . -B build -DBUILD_TESTING=ON
-      - name: Build
-        run: cmake --build build --parallel
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_TESTING=ON
+
+      - name: Compile recompxbox
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel 2
+
+      - name: Run unit tests
+        run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure
+
+      - name: Stage executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $exe = Get-ChildItem build -Filter recompxbox.exe -Recurse -File |
+            Where-Object { $_.FullName -notmatch 'CMakeFiles' } |
+            Select-Object -First 1
+          if (-not $exe) { throw "recompxbox.exe not found" }
+          Copy-Item $exe.FullName dist/recompxbox.exe
+
+      - name: Stage executable (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/recompxbox dist/recompxbox
+          chmod +x dist/recompxbox
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: recompxbox-${{ runner.os }}-${{ matrix.build_type }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
