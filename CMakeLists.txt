@@ -13,7 +13,8 @@ add_library(recompxbox_d3d8 STATIC
   src/iso/xdvdfs.cpp
   src/cpu/qemu_rsp.cpp
   src/gpu/nv2a.cpp
-  src/gpu/nv2a_mmio.cpp)
+  src/gpu/nv2a_mmio.cpp
+  src/xbox/xbox_firmware.cpp)
 target_include_directories(recompxbox_d3d8 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(recompxbox src/cli/main.cpp)
 target_link_libraries(recompxbox PRIVATE recompxbox_d3d8)
@@ -50,6 +51,9 @@ if(RECOMPXBOX_BUILD_RAYLIB)
   target_link_libraries(recompxbox_raylib_demo PRIVATE recompxbox_d3d8 raylib)
 endif()
 if(BUILD_TESTING)
+  add_executable(recompxbox_firmware_tests tests/xbox_firmware_tests.cpp)
+  target_link_libraries(recompxbox_firmware_tests PRIVATE recompxbox_d3d8)
+  add_test(NAME xbox_firmware COMMAND recompxbox_firmware_tests)
   add_executable(recompxbox_nv2a_mmio_tests tests/nv2a_mmio_tests.cpp)
   target_link_libraries(recompxbox_nv2a_mmio_tests PRIVATE recompxbox_d3d8)
   add_test(NAME nv2a_mmio COMMAND recompxbox_nv2a_mmio_tests)

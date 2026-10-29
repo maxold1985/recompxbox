@@ -1,11 +1,13 @@
 #include "recompxbox/xbe_image.h"
 #include "recompxbox/xdvdfs.h"
 #include "recompxbox/qemu_rsp.h"
+#include "recompxbox/xbox_firmware.h"
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -28,7 +30,7 @@ int main(int argc, char** argv) {
     // entry point and kernel thunk fields. It is NOT a bootable retail XBE.
     bool isoMode = false, decodeExport = false, debugKeys = false, qemuWrite = false, cpuTrace = false;
     std::string endpoint = "127.0.0.1:1234";
-    std::string inputPath, outputPath;
+    std::string inputPath, outputPath, biosPath, mcpxPath;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--qemu-tcp" && i + 1 < argc) {
@@ -36,6 +38,10 @@ int main(int argc, char** argv) {
             endpoint = argv[++i];
         } else if (arg == "--cpu-trace") {
             cpuTrace = true;
+        } else if (arg == "--bios" && i + 1 < argc) {
+            biosPath = argv[++i];
+        } else if (arg == "--mcpx" && i + 1 < argc) {
+            mcpxPath = argv[++i];
         } else if (arg == "--iso") {
             isoMode = true;
         } else if (arg == "--debug-keys") {
@@ -52,10 +58,27 @@ int main(int argc, char** argv) {
     }
     if (inputPath.empty() || (debugKeys && !decodeExport) || (cpuTrace && !qemuWrite)) {
         std::cerr << "Usage: recompxbox [--iso] <game.iso|default.xbe>"
-                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys] [--qemu-tcp host:port] [--cpu-trace]\n";
+                     " [--extract-xbe-decrypted <output.xbe>] [--debug-keys] [--qemu-tcp host:port] [--cpu-trace] [--bios xbox.bin] [--mcpx mcpx.bin]\n";
         return 2;
     }
 
+    // Optional firmware is validated and inspected locally. It is NOT yet
+    // attached to the generic PC QEMU machine or executed as Xbox firmware.
+    for (const auto& option : {std::pair<std::string, recompxbox::XboxFirmwareKind>{
+                                   biosPath, recompxbox::XboxFirmwareKind::FlashBios},
+                               {mcpxPath, recompxbox::XboxFirmwareKind::McpxBootRom}}) {
+        if (option.first.empty()) continue;
+        recompxbox::XboxFirmware firmware;
+        std::string firmwareError;
+        if (!recompxbox::loadXboxFirmware(option.first, option.second, firmware, firmwareError)) {
+            std::cerr << "Firmware error: " << firmwareError << "\n";
+            return 1;
+        }
+        std::cout << (option.second == recompxbox::XboxFirmwareKind::FlashBios
+                         ? "Xbox Flash BIOS" : "MCPX Boot ROM")
+                  << ": loaded " << firmware.bytes.size() << " bytes from "
+                  << firmware.path << " (inspection only; not mapped into QEMU)\n";
+    }
     std::vector<std::uint8_t> bytes;
     if (isoMode) {
         recompxbox::Xdvdfs iso;
