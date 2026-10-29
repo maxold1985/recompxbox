@@ -18,6 +18,12 @@ if [[ ! -x "$source_dir/build/qemu-system-i386" ]]; then
   echo "xemu build did not produce build/qemu-system-i386" >&2
   exit 1
 fi
-"$source_dir/build/qemu-system-i386" --version
+# xemu initializes SDL even for --version. Run it under a virtual display
+# on headless CI hosts; on a desktop keep the normal SDL environment.
+if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]] && command -v xvfb-run >/dev/null 2>&1; then
+  SDL_VIDEODRIVER=x11 xvfb-run -a "$source_dir/build/qemu-system-i386" --version
+else
+  "$source_dir/build/qemu-system-i386" --version
+fi
 echo "Xbox-capable xemu QEMU built: $source_dir/build/qemu-system-i386"
 echo "Note: this is a separate emulator, not linked to recompxbox raylib."
