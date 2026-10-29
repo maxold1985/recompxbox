@@ -32,6 +32,17 @@ bool loadXboxFirmware(const std::string& path, XboxFirmwareKind kind,
     out = std::move(result);
     return true;
 }
+bool readXboxBootByte(const XboxFirmware* flash, const XboxFirmware* mcpx,
+                      std::uint32_t address, std::uint8_t& value) {
+    if (address < 0xff000000u) return false;
+    // MCPX 1.0 boot ROM is mapped over the last 512 bytes of flash.
+    if (address >= 0xfffffe00u && mcpx &&
+        mcpx->kind == XboxFirmwareKind::McpxBootRom && mcpx->bytes.size() == 512) {
+        value = mcpx->bytes[address - 0xfffffe00u];
+        return true;
+    }
+    return flash && flash->readFlashByte(address, value);
+}
 bool XboxFirmware::readFlashByte(std::uint32_t address, std::uint8_t& out) const {
     if (kind != XboxFirmwareKind::FlashBios || bytes.empty() || address < 0xff000000u)
         return false;

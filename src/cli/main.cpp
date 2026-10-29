@@ -67,6 +67,8 @@ int main(int argc, char** argv) {
 
     // Optional firmware is validated and inspected locally. It is NOT yet
     // attached to the generic PC QEMU machine or executed as Xbox firmware.
+    recompxbox::XboxFirmware flashFirmware, mcpxFirmware;
+    bool haveFlash = false, haveMcpx = false;
     for (const auto& option : {std::pair<std::string, recompxbox::XboxFirmwareKind>{
                                    biosPath, recompxbox::XboxFirmwareKind::FlashBios},
                                {mcpxPath, recompxbox::XboxFirmwareKind::McpxBootRom}}) {
@@ -77,10 +79,36 @@ int main(int argc, char** argv) {
             std::cerr << "Firmware error: " << firmwareError << "\n";
             return 1;
         }
+        if (option.second == recompxbox::XboxFirmwareKind::FlashBios) {
+            flashFirmware = firmware;
+            haveFlash = true;
+        } else {
+            mcpxFirmware = firmware;
+            haveMcpx = true;
+        }
         std::cout << (option.second == recompxbox::XboxFirmwareKind::FlashBios
                          ? "Xbox Flash BIOS" : "MCPX Boot ROM")
                   << ": loaded " << firmware.bytes.size() << " bytes from "
                   << firmware.path << " (inspection only; not mapped into QEMU)\n";
+    }
+    if (haveFlash || haveMcpx) {
+        // The reset vector is at physical 0xFFFFFFF0 (CS base + EIP).
+        // This models Xbox ROM visibility, not QEMU machine memory mapping.
+        std::cout << "Xbox firmware reset vector at 0xFFFFFFF0:";
+        for (std::uint32_t i = 0; i < 16; ++i) {
+            std::uint8_t value = 0;
+            if (!recompxbox::readXboxBootByte(
+                    haveFlash ? &flashFirmware : nullptr,
+                    haveMcpx ? &mcpxFirmware : nullptr,
+                    0xfffffff0u + i, value)) {
+                std::cout << " unavailable";
+                break;
+            }
+            std::cout << ' ' << std::hex << std::setw(2) << std::setfill('0')
+                      << static_cast<unsigned>(value) << std::dec;
+        }
+        std::cout << "\nXbox ROM address map: host-side inspection only; "
+                     "QEMU -machine pc still uses PC firmware.\n";
     }
     std::vector<std::uint8_t> bytes;
     if (isoMode) {
