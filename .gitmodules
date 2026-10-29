@@ -7,3 +7,6 @@
 [submodule "third_party/xqemu"]
 	path = third_party/xqemu
 	url = https://github.com/xqemu/xqemu.git
+[submodule "third_party/qemu"]
+	path = third_party/qemu
+	url = https://github.com/qemu/qemu.git

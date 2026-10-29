@@ -58,3 +58,21 @@ if(BUILD_TESTING)
   target_link_libraries(recompxbox_x86_probe_tests PRIVATE recompxbox_d3d8)
   add_test(NAME x86_probe COMMAND recompxbox_x86_probe_tests)
 endif()
+
+# Optional upstream QEMU/TCG build. This is a separate toolchain target,
+# not a linked library or an Xbox runtime CPU backend yet.
+option(RECOMPXBOX_BUILD_QEMU_TCG "Expose external upstream QEMU TCG build target" OFF)
+if(RECOMPXBOX_BUILD_QEMU_TCG)
+  if(NOT UNIX OR APPLE)
+    message(FATAL_ERROR "QEMU TCG integration build currently supports Linux/WSL2 only")
+  endif()
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/qemu/configure")
+    message(FATAL_ERROR "Initialize QEMU: git submodule update --init third_party/qemu")
+  endif()
+  add_custom_target(recompxbox_qemu_tcg
+    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_qemu_tcg.sh"
+      "${CMAKE_CURRENT_BINARY_DIR}/qemu-tcg"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    USES_TERMINAL
+    COMMENT "Build standalone QEMU i386 system emulator with TCG (not linked into recompxbox)")
+endif()
