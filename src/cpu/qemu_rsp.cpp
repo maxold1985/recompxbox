@@ -1,6 +1,7 @@
 #include "recompxbox/qemu_rsp.h"
 #include <algorithm>
 #include <cstdio>
+#include <iostream>
 #include <string>
 #ifdef _WIN32
 #include <winsock2.h>
@@ -62,8 +63,8 @@ bool rsp(Sock s, const std::string& cmd, std::string& answer) {
 }
 bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string& error) {
     constexpr char hex[]="0123456789abcdef";
-    for (size_t off=0; off<len; off+=512) {
-        size_t n=std::min<size_t>(512,len-off);
+    for (size_t off=0; off<len; off+=1024) {
+        size_t n=std::min<size_t>(1024,len-off);
         char label[64];
         std::snprintf(label,sizeof(label),"M%llx,%zx:",
                       static_cast<unsigned long long>(addr+off),n);
@@ -77,6 +78,10 @@ bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string&
         if (!rsp(s,cmd,reply) || reply!="OK") {
             error="QEMU rejected memory write at "+std::to_string(addr+off);
             return false;
+        }
+        if ((off / 1024) % 256 == 0 || off + n == len) {
+            std::cout << "  TCP progress: " << (off + n) << "/" << len
+                      << " bytes\n" << std::flush;
         }
     }
     return true;
@@ -97,6 +102,7 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
     WSADATA ws{};
     if (WSAStartup(MAKEWORD(2,2),&ws)!=0) {error="Winsock startup failed";return false;}
 #endif
+    std::cout << "QEMU TCP: resolving " << endpoint << "\n" << std::flush;
     addrinfo hints{};
     hints.ai_socktype=SOCK_STREAM;
     addrinfo* addresses=nullptr;
@@ -114,6 +120,7 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
             setsockopt(sock,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));
             setsockopt(sock,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout));
 #endif
+            std::cout << "QEMU TCP: connecting...\n" << std::flush;
             if (connect(sock,p->ai_addr,static_cast<int>(p->ai_addrlen))==0) break;
             shut(sock);
             sock=bad;
@@ -123,11 +130,16 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
     bool ok=sock!=bad;
     if (!ok) error="Cannot connect to QEMU TCP";
     std::string reply;
+    if (ok) std::cout << "QEMU TCP: connected, negotiating GDB RSP...\n" << std::flush;
     if (ok && !(ok=rsp(sock,"qSupported:multiprocess+",reply)))
         error="QEMU GDB handshake failed";
+    if (ok) std::cout << "QEMU RSP: " << reply << "\n" << std::flush;
+    if (ok) std::cout << "QEMU TCP: writing XBE header...\n" << std::flush;
     if (ok) ok=write(sock,image.header.baseAddress,image.memory.data(),
                      image.header.headerSize,error);
     if (ok) for (const auto& section:image.sections) {
+        std::cout << "QEMU TCP: section VA=0x" << std::hex << section.virtualAddress
+                  << std::dec << " size=" << section.virtualSize << "\n" << std::flush;
         const size_t off=section.virtualAddress-image.header.baseAddress;
         if (!(ok=write(sock,section.virtualAddress,image.memory.data()+off,
                        section.virtualSize,error))) break;
