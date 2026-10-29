@@ -61,10 +61,10 @@ bool rsp(Sock s, const std::string& cmd, std::string& answer) {
     }
     return sendAll(s,"+");
 }
-bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string& error) {
+bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, size_t chunkSize, std::string& error) {
     constexpr char hex[]="0123456789abcdef";
-    for (size_t off=0; off<len; off+=1024) {
-        size_t n=std::min<size_t>(1024,len-off);
+    for (size_t off=0; off<len; off+=chunkSize) {
+        size_t n=std::min(chunkSize,len-off);
         char label[64];
         std::snprintf(label,sizeof(label),"M%llx,%zx:",
                       static_cast<unsigned long long>(addr+off),n);
@@ -84,7 +84,7 @@ bool write(Sock s, uint64_t addr, const uint8_t* bytes, size_t len, std::string&
                   " (reply: "+reply+")";
             return false;
         }
-        if ((off / 1024) % 256 == 0 || off + n == len) {
+        if ((off / chunkSize) % 32 == 0 || off + n == len) {
             std::cout << "  TCP progress: " << (off + n) << "/" << len
                       << " bytes\n" << std::flush;
         }
@@ -139,15 +139,35 @@ bool sendXbeToQemu(const XbeImage& image, const std::string& endpoint, std::stri
     if (ok && !(ok=rsp(sock,"qSupported:multiprocess+",reply)))
         error="QEMU GDB handshake failed";
     if (ok) std::cout << "QEMU RSP: " << reply << "\n" << std::flush;
+    size_t chunkSize = 1024;
+    if (ok) {
+        // PacketSize is a hexadecimal GDB RSP packet payload limit.
+        const auto marker = reply.find("PacketSize=");
+        if (marker != std::string::npos) {
+            const auto begin = marker + 11;
+            const auto end = reply.find(';', begin);
+            try {
+                const auto limit = std::stoul(reply.substr(begin, end - begin), nullptr, 16);
+                // M packet encodes each byte as two hex characters.
+                // Reserve 64 characters for the address and length prefix.
+                if (limit >= 256 && limit <= 1048576)
+                    chunkSize = std::min<size_t>(16384, (limit - 64) / 2);
+            } catch (...) {
+                // Fall back to the conservative 1024-byte writes.
+            }
+        }
+        std::cout << "QEMU TCP: negotiated write chunk = " << chunkSize
+                  << " bytes\n" << std::flush;
+    }
     if (ok) std::cout << "QEMU TCP: writing XBE header...\n" << std::flush;
     if (ok) ok=write(sock,image.header.baseAddress,image.memory.data(),
-                     image.header.headerSize,error);
+                     image.header.headerSize,chunkSize,error);
     if (ok) for (const auto& section:image.sections) {
         std::cout << "QEMU TCP: section VA=0x" << std::hex << section.virtualAddress
                   << std::dec << " size=" << section.virtualSize << "\n" << std::flush;
         const size_t off=section.virtualAddress-image.header.baseAddress;
         if (!(ok=write(sock,section.virtualAddress,image.memory.data()+off,
-                       section.virtualSize,error))) break;
+                       section.virtualSize,chunkSize,error))) break;
     }
     if (sock!=bad) shut(sock);
 #ifdef _WIN32
