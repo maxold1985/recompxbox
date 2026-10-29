@@ -1,0 +1,9 @@
+[submodule "third_party/Cxbx-Reloaded"]
+	path = third_party/Cxbx-Reloaded
+	url = https://github.com/Xbox-dev/Cxbx-Reloaded.git
+[submodule "third_party/xemu"]
+	path = third_party/xemu
+	url = https://github.com/xemu-project/xemu.git
+[submodule "third_party/xqemu"]
+	path = third_party/xqemu
+	url = https://github.com/xqemu/xqemu.git
